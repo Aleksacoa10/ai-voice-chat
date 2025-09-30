@@ -1,0 +1,6 @@
+.gradle/
+*.lock
+node_modules/
+AppData/
+build/
+.cache/

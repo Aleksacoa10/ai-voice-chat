@@ -19,6 +19,7 @@ server.listen(process.env.PORT || 10000, () => {
   console.log("🟢 WebSocket server je pokrenut");
 });
 
+
 wss.on('connection', (ws) => {
   let buffer = [];
 
