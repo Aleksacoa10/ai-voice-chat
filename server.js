@@ -7,8 +7,16 @@ const { OpenAI } = require('openai');
 const openai = new OpenAI({ apiKey: 'sk-0d9c33d52621a1036ee1a31933830176f5612e99f3026424' });
 const elevenApiKey = 'sk-0d9c33d52621a1036ee1a31933830176f5612e99f3026424'; // koristi isti jer je ElevenLabs key
 
-const wss = new WebSocket.Server({ port: 8080 }, () => {
-  console.log("🟢 WebSocket server je pokrenut na portu 8080");
+const express = require('express');
+const http = require('http');
+const { Server } = require('ws');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new Server({ server });
+
+server.listen(process.env.PORT || 10000, () => {
+  console.log("🟢 WebSocket server je pokrenut");
 });
 
 wss.on('connection', (ws) => {
