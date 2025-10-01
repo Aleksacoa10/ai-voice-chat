@@ -59,22 +59,25 @@ wss.on('connection', (ws) => {
         console.log("🤖 Bot odgovorio:", botText);
 
         // 3. ElevenLabs TTS
-        const ttsResp = await axios.post(
-          'https://elevenlabs.io/app/voice-library?voiceId=j9jfwdrw7BRfcR43Qohk',
-          {
-            text: botText,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: { stability: 0.4, similarity_boost: 0.8 }
-          },
-          {
-            headers: {
-              'xi-api-key': elevenApiKey,
-              'Content-Type': 'application/json',
-              'Accept': 'audio/mpeg'
-            },
-            responseType: 'arraybuffer'
-          }
-        );
+const ttsResp = await axios.post(
+  'https://api.elevenlabs.io/v1/text-to-speech/j9jfwdrw7BRfcR43Qohk',
+  {
+    text: 'Hello from ElevenLabs!',
+    model_id: 'eleven_monolingual_v1',
+    voice_settings: {
+      stability: 0.5,
+      similarity_boost: 0.5
+    }
+  },
+  {
+    headers: {
+      'xi-api-key': process.env.ELEVEN_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    responseType: 'arraybuffer'
+  }
+);
+
 
         ws.send(ttsResp.data); // pošalji glas
       } catch (err) {
