@@ -1,9 +1,9 @@
 require('dotenv').config();
-
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const { OpenAI } = require('openai');
+const mysql = require('mysql2/promise');
 const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
@@ -14,8 +14,28 @@ const wss = new Server({ server });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// 🔁 MySQL pool konekcija
+const db = mysql.createPool({
+  host: 'localhost',
+  user: 'planirajrs_zakazivanjeadmin',
+  password: 'ADtamckd}SX^',
+  database: 'planirajrs_zakazivanje'
+});
+
+// 🧠 Kontekst iz baze
+async function getContextFromDatabase() {
+  const [services] = await db.query("SELECT name FROM services");
+  const [staff] = await db.query("SELECT name FROM employees");
+
+  const serviceList = services.map(s => s.name).join(', ');
+  const staffList = staff.map(s => s.name).join(', ');
+
+  return `Dostupne usluge su: ${serviceList}. Dostupni zaposleni su: ${staffList}.`;
+}
+
+// 🚀 Pokreni server
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
+  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS + MySQL Pool)");
 });
 
 wss.on('connection', (ws) => {
@@ -47,8 +67,13 @@ wss.on('connection', (ws) => {
         const userText = whisperResp.data.text;
         console.log("🎤 Korisnik rekao:", userText);
 
+        const contextText = await getContextFromDatabase();
+
         const chat = await openai.chat.completions.create({
-          messages: [{ role: 'user', content: userText }],
+          messages: [
+            { role: 'system', content: contextText },
+            { role: 'user', content: userText }
+          ],
           model: 'gpt-4o'
         });
 
@@ -56,8 +81,8 @@ wss.on('connection', (ws) => {
         console.log("🤖 Bot odgovorio:", botText);
 
         const ttsResp = await openai.audio.speech.create({
-          model: "tts-1",  // novi TTS model
-          voice: "onyx",   // prirodniji glas
+          model: "tts-1",
+          voice: "onyx",
           input: botText
         });
 
