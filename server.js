@@ -1,94 +1,51 @@
 require('dotenv').config();
 
-const WebSocket = require('ws');
-const fs = require('fs');
-const axios = require('axios');
-const FormData = require('form-data');
-const { OpenAI } = require('openai');
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const elevenApiKey = process.env.ELEVEN_API_KEY;
-
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
+const axios = require('axios');
 const { Server } = require('ws');
 
+const elevenApiKey = process.env.ELEVEN_API_KEY;
+const voiceId = process.env.ELEVEN_VOICE_ID;
+
 const app = express();
+app.use(express.static('.')); // omogućava preuzimanje fajlova kao test.mp3
+
 const server = http.createServer(app);
 const wss = new Server({ server });
 
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket server je pokrenut");
+  console.log("🟢 WebSocket test server je pokrenut");
 });
 
-
 wss.on('connection', (ws) => {
-  let buffer = [];
+  ws.on('message', async () => {
+    const botText = "Ovo je test poruka preko ElevenLabs.";
+    console.log("🧪 Testiram ElevenLabs sa porukom:", botText);
 
-  ws.on('message', async (data) => {
-    if (data.toString() === 'END') {
-      const audioPath = './temp_input.webm';
-      fs.writeFileSync(audioPath, Buffer.concat(buffer));
-
-      try {
-        // 1. Whisper STT
-        const formData = new FormData();
-        formData.append('file', fs.createReadStream(audioPath));
-        formData.append('model', 'whisper-1');
-
-        const whisperResp = await axios.post(
-          'https://api.openai.com/v1/audio/transcriptions',
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${openai.apiKey}`,
-              ...formData.getHeaders(),
-            }
-          }
-        );
-
-        const userText = whisperResp.data.text;
-        console.log("🎤 Korisnik rekao:", userText);
-
-        // 2. GPT-4 odgovor
-        const chat = await openai.chat.completions.create({
-          messages: [{ role: 'user', content: userText }],
-          model: 'gpt-4'
-        });
-
-        const botText = chat.choices[0].message.content;
-        console.log("🤖 Bot odgovorio:", botText);
-
-        // 3. ElevenLabs TTS
-        console.log("🎙️ Voice ID:", process.env.ELEVEN_VOICE_ID);
-
-        const ttsResp = await axios.post(
-          `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
-          {
-            text: botText,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: { stability: 0.4, similarity_boost: 0.8 }
+    try {
+      const ttsResp = await axios.post(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          text: botText,
+          model_id: 'eleven_monolingual_v1',
+          voice_settings: { stability: 0.4, similarity_boost: 0.8 }
+        },
+        {
+          headers: {
+            'xi-api-key': elevenApiKey,
+            'Content-Type': 'application/json',
+            'Accept': 'audio/mpeg'
           },
-          {
-            headers: {
-              'xi-api-key': elevenApiKey,
-              'Content-Type': 'application/json',
-              'Accept': 'audio/mpeg'
-            },
-            responseType: 'arraybuffer'
-          }
-        );
+          responseType: 'arraybuffer'
+        }
+      );
 
-        ws.send(ttsResp.data); // pošalji glas
-      } catch (err) {
-        console.error("❌ Greška:", err);
-        ws.send("Greška u obradi.");
-      }
-
-      buffer = [];
-      fs.unlinkSync(audioPath); // obriši fajl
-    } else {
-      buffer.push(data);
+      fs.writeFileSync("test.mp3", ttsResp.data);
+      console.log("✅ test.mp3 uspešno snimljen!");
+    } catch (err) {
+      console.error("❌ TTS greška:", err.response?.status, err.response?.data || err.message);
     }
   });
 });
