@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const WebSocket = require('ws');
 const fs = require('fs');
 const axios = require('axios');
@@ -6,7 +8,6 @@ const { OpenAI } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const elevenApiKey = process.env.ELEVEN_API_KEY;
-console.log("🔑 Eleven API KEY:", elevenApiKey);
 
 const express = require('express');
 const http = require('http');
@@ -59,23 +60,22 @@ wss.on('connection', (ws) => {
         console.log("🤖 Bot odgovorio:", botText);
 
         // 3. ElevenLabs TTS
-const ttsResp = await axios.post(
-  'https://api.elevenlabs.io/v1/text-to-speech/j9jfwdrw7BRfcR43Qohk', // ← tvoj Voice ID
-  {
-    text: botText,
-    model_id: 'eleven_monolingual_v1',
-    voice_settings: { stability: 0.4, similarity_boost: 0.8 }
-  },
-  {
-    headers: {
-      'xi-api-key': 'sk_8974dc8f72f263b9115ba78a29aaa43433a98107c918a057', // ← tvoj API ključ
-      'Content-Type': 'application/json',
-      'Accept': 'audio/mpeg'
-    },
-    responseType: 'arraybuffer'
-  }
-);
-
+        const ttsResp = await axios.post(
+          `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
+          {
+            text: botText,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: { stability: 0.4, similarity_boost: 0.8 }
+          },
+          {
+            headers: {
+              'xi-api-key': elevenApiKey,
+              'Content-Type': 'application/json',
+              'Accept': 'audio/mpeg'
+            },
+            responseType: 'arraybuffer'
+          }
+        );
 
         ws.send(ttsResp.data); // pošalji glas
       } catch (err) {
