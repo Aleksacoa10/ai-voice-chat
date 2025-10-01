@@ -4,7 +4,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { OpenAI } = require('openai');
 
-const openai = new OpenAI({ apiKey: 'sk-0d9c33d52621a1036ee1a31933830176f5612e99f3026424' });
+const openai = new OpenAI({ apiKey: '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' });
 const elevenApiKey = 'sk-0d9c33d52621a1036ee1a31933830176f5612e99f3026424'; // koristi isti jer je ElevenLabs key
 
 const express = require('express');
