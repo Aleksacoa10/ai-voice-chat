@@ -6,6 +6,7 @@ const { OpenAI } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const elevenApiKey = process.env.ELEVEN_API_KEY;
+console.log("🔑 Eleven API KEY:", elevenApiKey);
 
 const express = require('express');
 const http = require('http');
