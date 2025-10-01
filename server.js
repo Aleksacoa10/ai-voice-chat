@@ -26,7 +26,7 @@ wss.on('connection', (ws) => {
 
     try {
       const ttsResp = await axios.post(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
         {
           text: botText,
           model_id: 'eleven_monolingual_v1',
@@ -34,7 +34,7 @@ wss.on('connection', (ws) => {
         },
         {
           headers: {
-            'xi-api-key': elevenApiKey,
+            'xi-api-key': process.env.ELEVEN_API_KEY,
             'Content-Type': 'application/json',
             'Accept': 'audio/mpeg'
           },
@@ -44,8 +44,11 @@ wss.on('connection', (ws) => {
 
       fs.writeFileSync("test.mp3", ttsResp.data);
       console.log("✅ test.mp3 uspešno snimljen!");
+
+      ws.send("https://ai-voice-chat-apiv.onrender.com/test.mp3");
     } catch (err) {
       console.error("❌ TTS greška:", err.response?.status, err.response?.data || err.message);
+      ws.send("Greška prilikom snimanja.");
     }
   });
 });
