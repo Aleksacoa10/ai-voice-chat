@@ -60,6 +60,8 @@ wss.on('connection', (ws) => {
         console.log("🤖 Bot odgovorio:", botText);
 
         // 3. ElevenLabs TTS
+        console.log("🎙️ Voice ID:", process.env.ELEVEN_VOICE_ID);
+
         const ttsResp = await axios.post(
           `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
           {
