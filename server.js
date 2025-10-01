@@ -16,10 +16,10 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // 🔁 MySQL pool konekcija
 const db = mysql.createPool({
-  host: '127.0.0.1',
-  user: 'planirajrs_zakazivanjeadmin',
-  password: 'ADtamckd}SX^',
-  database: 'planirajrs_zakazivanje'
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME
 });
 
 // 🧠 Kontekst iz baze
