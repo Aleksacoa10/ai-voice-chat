@@ -1,4 +1,4 @@
-require('dotenv').config();
+
 
 const express = require('express');
 const http = require('http');
@@ -6,8 +6,9 @@ const fs = require('fs');
 const axios = require('axios');
 const { Server } = require('ws');
 
-const elevenApiKey = process.env.ELEVEN_API_KEY;
-const voiceId = process.env.ELEVEN_VOICE_ID;
+const elevenApiKey = '3de84d40128b24bd3aa593c311a3dd3f29b5ebc83ff6e77437b166dca339df41';
+const voiceId = 'EXAVITQu4vr4xnSDxMaL';
+
 
 const app = express();
 
