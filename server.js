@@ -6,7 +6,7 @@ const fs = require('fs');
 const axios = require('axios');
 const { Server } = require('ws');
 
-const elevenApiKey = '3de84d40128b24bd3aa593c311a3dd3f29b5ebc83ff6e77437b166dca339df41';
+const elevenApiKey = 'sk_3dd6d1aa43d9b12d415efca360dda108ef33c3ad2d665d58';
 const voiceId = 'EXAVITQu4vr4xnSDxMaL';
 
 
