@@ -17,7 +17,7 @@ const server = http.createServer(app);
 const wss = new Server({ server });
 
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
+  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS, srpski)");
 });
 
 wss.on('connection', (ws) => {
@@ -29,7 +29,7 @@ wss.on('connection', (ws) => {
       fs.writeFileSync(audioPath, Buffer.concat(buffer));
 
       try {
-        // 1. 🎤 Whisper STT (pretvori glas u tekst)
+        // 1. 🎤 Whisper STT (prepoznaje srpski automatski)
         const formData = new FormData();
         formData.append('file', fs.createReadStream(audioPath));
         formData.append('model', 'whisper-1');
@@ -48,26 +48,34 @@ wss.on('connection', (ws) => {
         const userText = whisperResp.data.text;
         console.log("🎤 Korisnik rekao:", userText);
 
-        // 2. 💬 GPT odgovor
+        // 2. 💬 GPT odgovor na srpskom
         const chat = await openai.chat.completions.create({
-          messages: [{ role: 'user', content: userText }],
           model: 'gpt-4',
+          messages: [
+            { role: "system", content: "Odgovaraj isključivo na srpskom jeziku." },
+            { role: 'user', content: userText }
+          ],
         });
 
         const botText = chat.choices[0].message.content;
         console.log("🤖 Bot odgovorio:", botText);
 
-        // 3. 🔊 OpenAI TTS (pretvori tekst u glas)
+        // 3. 🔊 OpenAI TTS
         const ttsResp = await openai.audio.speech.create({
-          model: "gpt-4o-mini-tts",   // OpenAI TTS model
-          voice: "alloy",             // biraš glas: alloy, verse, nova...
+          model: "gpt-4o-mini-tts",
+          voice: "alloy",   // alloy, verse, nova, sage
           input: botText,
         });
 
+        // Pretvori u buffer
         const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
 
-        // Pošalji binarni audio klijentu
-        ws.send(audioBuffer);
+        // Opcija 1: Snimi fajl i šalji URL (browser-friendly)
+        const outPath = "./public/response.mp3";
+        fs.writeFileSync(outPath, audioBuffer);
+        ws.send(JSON.stringify({ audioUrl: "/response.mp3", text: botText }));
+
+        // Opcija 2 (ako hoćeš raw audio kroz WS): ws.send(audioBuffer);
 
       } catch (err) {
         console.error("❌ Greška:", err.response?.data || err.message);
@@ -81,3 +89,4 @@ wss.on('connection', (ws) => {
     }
   });
 });
+
