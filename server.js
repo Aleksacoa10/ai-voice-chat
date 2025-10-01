@@ -89,7 +89,8 @@ wss.on('connection', (ws) => {
         const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
         ws.send(audioBuffer);
       } catch (err) {
-        console.error("❌ Greška:", err.response?.data || err.message);
+        console.error("❌ Greška:", err);
+
         ws.send("Greška u obradi.");
       }
 
