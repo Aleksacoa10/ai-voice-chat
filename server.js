@@ -1,50 +1,83 @@
 require('dotenv').config();
 
-const express = require('express');
-const http = require('http');
+const WebSocket = require('ws');
 const fs = require('fs');
 const axios = require('axios');
+const FormData = require('form-data');
+const { OpenAI } = require('openai');
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const express = require('express');
+const http = require('http');
 const { Server } = require('ws');
 
 const app = express();
-app.use(express.static('public'));
-
 const server = http.createServer(app);
 const wss = new Server({ server });
 
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket test server je pokrenut (OpenAI TTS)");
+  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
 });
 
 wss.on('connection', (ws) => {
-  ws.on('message', async () => {
-    const botText = "Ovo je test poruka preko OpenAI TTS.";
-    console.log("🧪 Testiram OpenAI TTS sa porukom:", botText);
+  let buffer = [];
 
-    try {
-      const resp = await axios.post(
-        "https://api.openai.com/v1/audio/speech",
-        {
-          model: "gpt-4o-mini-tts",
-          voice: "alloy",  // možeš promeniti: alloy, verse, shimmer, coral
-          input: botText
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          responseType: "arraybuffer"
-        }
-      );
+  ws.on('message', async (data) => {
+    if (data.toString() === 'END') {
+      const audioPath = './temp_input.webm';
+      fs.writeFileSync(audioPath, Buffer.concat(buffer));
 
-      fs.writeFileSync("public/test.mp3", resp.data);
-      console.log("✅ test.mp3 snimljen sa OpenAI TTS");
+      try {
+        // 1. 🎤 Whisper STT (pretvori glas u tekst)
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(audioPath));
+        formData.append('model', 'whisper-1');
 
-      ws.send("https://ai-voice-chat-apiv.onrender.com/test.mp3");
-    } catch (err) {
-      console.error("❌ Greška OpenAI TTS:", err.response?.status, err.response?.data || err.message);
-      ws.send("Greška prilikom snimanja.");
+        const whisperResp = await axios.post(
+          'https://api.openai.com/v1/audio/transcriptions',
+          formData,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+              ...formData.getHeaders(),
+            }
+          }
+        );
+
+        const userText = whisperResp.data.text;
+        console.log("🎤 Korisnik rekao:", userText);
+
+        // 2. 💬 GPT odgovor
+        const chat = await openai.chat.completions.create({
+          messages: [{ role: 'user', content: userText }],
+          model: 'gpt-4',
+        });
+
+        const botText = chat.choices[0].message.content;
+        console.log("🤖 Bot odgovorio:", botText);
+
+        // 3. 🔊 OpenAI TTS (pretvori tekst u glas)
+        const ttsResp = await openai.audio.speech.create({
+          model: "gpt-4o-mini-tts",   // OpenAI TTS model
+          voice: "alloy",             // biraš glas: alloy, verse, nova...
+          input: botText,
+        });
+
+        const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
+
+        // Pošalji binarni audio klijentu
+        ws.send(audioBuffer);
+
+      } catch (err) {
+        console.error("❌ Greška:", err.response?.data || err.message);
+        ws.send("Greška u obradi.");
+      }
+
+      buffer = [];
+      fs.unlinkSync(audioPath); // očisti fajl
+    } else {
+      buffer.push(data);
     }
   });
 });
