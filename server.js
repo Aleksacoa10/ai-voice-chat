@@ -10,7 +10,9 @@ const elevenApiKey = process.env.ELEVEN_API_KEY;
 const voiceId = process.env.ELEVEN_VOICE_ID;
 
 const app = express();
-app.use(express.static('.')); // omogućava preuzimanje fajlova kao test.mp3
+
+// 🚩 SERVE PUBLIC FOLDER (ovo je bitno!)
+app.use(express.static('public'));
 
 const server = http.createServer(app);
 const wss = new Server({ server });
@@ -26,7 +28,7 @@ wss.on('connection', (ws) => {
 
     try {
       const ttsResp = await axios.post(
-        `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
         {
           text: botText,
           model_id: 'eleven_monolingual_v1',
@@ -34,7 +36,7 @@ wss.on('connection', (ws) => {
         },
         {
           headers: {
-            'xi-api-key': process.env.ELEVEN_API_KEY,
+            'xi-api-key': elevenApiKey,
             'Content-Type': 'application/json',
             'Accept': 'audio/mpeg'
           },
@@ -42,9 +44,11 @@ wss.on('connection', (ws) => {
         }
       );
 
-      fs.writeFileSync("test.mp3", ttsResp.data);
+      // 🚩 SNIMI U PUBLIC FOLDER
+      fs.writeFileSync("public/test.mp3", ttsResp.data);
       console.log("✅ test.mp3 uspešno snimljen!");
 
+      // 🚩 POŠALJI LINK KLIJENTU
       ws.send("https://ai-voice-chat-apiv.onrender.com/test.mp3");
     } catch (err) {
       console.error("❌ TTS greška:", err.response?.status, err.response?.data || err.message);
