@@ -1,11 +1,13 @@
+require('dotenv').config();
+
 const WebSocket = require('ws');
 const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const { OpenAI } = require('openai');
 
-const openai = new OpenAI({ apiKey: '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' });
-const elevenApiKey = 'sk-0d9c33d52621a1036ee1a31933830176f5612e99f3026424'; // koristi isti jer je ElevenLabs key
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const elevenApiKey = process.env.ELEVEN_API_KEY;
 
 const express = require('express');
 const http = require('http');
@@ -20,7 +22,7 @@ server.listen(process.env.PORT || 10000, () => {
 });
 
 
-wss.on('connection', (ws) => { 
+wss.on('connection', (ws) => {
   let buffer = [];
 
   ws.on('message', async (data) => {
@@ -82,7 +84,7 @@ wss.on('connection', (ws) => {
       }
 
       buffer = [];
-      if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
+      fs.unlinkSync(audioPath); // obriši fajl
     } else {
       buffer.push(data);
     }
