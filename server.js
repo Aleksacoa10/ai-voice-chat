@@ -16,7 +16,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // 🔁 MySQL pool konekcija
 const db = mysql.createPool({
-  host: 'localhost',
+  host: '127.0.0.1',
   user: 'planirajrs_zakazivanjeadmin',
   password: 'ADtamckd}SX^',
   database: 'planirajrs_zakazivanje'
