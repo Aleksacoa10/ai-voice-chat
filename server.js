@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 const WebSocket = require('ws');
 const fs = require('fs');
 const axios = require('axios');
