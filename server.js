@@ -82,7 +82,7 @@ wss.on('connection', (ws) => {
       }
 
       buffer = [];
-      fs.unlinkSync(audioPath); // obriši fajl
+      if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
     } else {
       buffer.push(data);
     }
