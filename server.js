@@ -60,7 +60,7 @@ wss.on('connection', (ws) => {
 
         // 3. ElevenLabs TTS
         const ttsResp = await axios.post(
-          'https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL',
+          'https://elevenlabs.io/app/voice-library?voiceId=j9jfwdrw7BRfcR43Qohk',
           {
             text: botText,
             model_id: 'eleven_monolingual_v1',
