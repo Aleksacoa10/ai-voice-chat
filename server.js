@@ -20,7 +20,7 @@ server.listen(process.env.PORT || 10000, () => {
 });
 
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws) => { 
   let buffer = [];
 
   ws.on('message', async (data) => {
