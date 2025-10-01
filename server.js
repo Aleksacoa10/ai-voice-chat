@@ -3,7 +3,6 @@ const fs = require('fs');
 const axios = require('axios');
 const FormData = require('form-data');
 const { OpenAI } = require('openai');
-const mysql = require('mysql2/promise');
 const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
@@ -11,31 +10,10 @@ const { Server } = require('ws');
 const app = express();
 const server = http.createServer(app);
 const wss = new Server({ server });
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 🔁 MySQL pool konekcija
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME
-});
-
-// 🧠 Kontekst iz baze
-async function getContextFromDatabase() {
-  const [services] = await db.query("SELECT name FROM services");
-  const [staff] = await db.query("SELECT name FROM employees");
-
-  const serviceList = services.map(s => s.name).join(', ');
-  const staffList = staff.map(s => s.name).join(', ');
-
-  return `Dostupne usluge su: ${serviceList}. Dostupni zaposleni su: ${staffList}.`;
-}
-
-// 🚀 Pokreni server
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS + MySQL Pool)");
+  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
 });
 
 wss.on('connection', (ws) => {
@@ -67,13 +45,8 @@ wss.on('connection', (ws) => {
         const userText = whisperResp.data.text;
         console.log("🎤 Korisnik rekao:", userText);
 
-        const contextText = await getContextFromDatabase();
-
         const chat = await openai.chat.completions.create({
-          messages: [
-            { role: 'system', content: contextText },
-            { role: 'user', content: userText }
-          ],
+          messages: [{ role: 'user', content: userText }],
           model: 'gpt-4o'
         });
 
@@ -89,8 +62,7 @@ wss.on('connection', (ws) => {
         const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
         ws.send(audioBuffer);
       } catch (err) {
-        console.error("❌ Greška:", err);
-
+        console.error("❌ Greška:", err.response?.data || err.message);
         ws.send("Greška u obradi.");
       }
 
