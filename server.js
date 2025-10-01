@@ -1,4 +1,4 @@
-
+require('dotenv').config();
 
 const express = require('express');
 const http = require('http');
@@ -6,53 +6,44 @@ const fs = require('fs');
 const axios = require('axios');
 const { Server } = require('ws');
 
-const elevenApiKey = 'sk_f0d9a88a21c9fd7d316452cba9f833269b805deef89d15d7';
-const voiceId = 'EXAVITQu4vr4xnSDxMaL';
-
-
 const app = express();
-
-// 🚩 SERVE PUBLIC FOLDER (ovo je bitno!)
 app.use(express.static('public'));
 
 const server = http.createServer(app);
 const wss = new Server({ server });
 
 server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket test server je pokrenut");
+  console.log("🟢 WebSocket test server je pokrenut (OpenAI TTS)");
 });
 
 wss.on('connection', (ws) => {
   ws.on('message', async () => {
-    const botText = "Ovo je test poruka preko ElevenLabs.";
-    console.log("🧪 Testiram ElevenLabs sa porukom:", botText);
+    const botText = "Ovo je test poruka preko OpenAI TTS.";
+    console.log("🧪 Testiram OpenAI TTS sa porukom:", botText);
 
     try {
-      const ttsResp = await axios.post(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      const resp = await axios.post(
+        "https://api.openai.com/v1/audio/speech",
         {
-          text: botText,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: { stability: 0.4, similarity_boost: 0.8 }
+          model: "gpt-4o-mini-tts",
+          voice: "alloy",  // možeš promeniti: alloy, verse, shimmer, coral
+          input: botText
         },
         {
           headers: {
-            'xi-api-key': elevenApiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'audio/mpeg'
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json"
           },
-          responseType: 'arraybuffer'
+          responseType: "arraybuffer"
         }
       );
 
-      // 🚩 SNIMI U PUBLIC FOLDER
-      fs.writeFileSync("public/test.mp3", ttsResp.data);
-      console.log("✅ test.mp3 uspešno snimljen!");
+      fs.writeFileSync("public/test.mp3", resp.data);
+      console.log("✅ test.mp3 snimljen sa OpenAI TTS");
 
-      // 🚩 POŠALJI LINK KLIJENTU
       ws.send("https://ai-voice-chat-apiv.onrender.com/test.mp3");
     } catch (err) {
-      console.error("❌ TTS greška:", err.response?.status, err.response?.data || err.message);
+      console.error("❌ Greška OpenAI TTS:", err.response?.status, err.response?.data || err.message);
       ws.send("Greška prilikom snimanja.");
     }
   });
