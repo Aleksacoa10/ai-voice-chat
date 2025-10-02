@@ -1,6 +1,4 @@
 require('dotenv').config();
-const fs = require('fs');
-const axios = require('axios');
 const { OpenAI } = require('openai');
 const express = require('express');
 const expressWs = require('express-ws');
@@ -11,18 +9,15 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.ws('/voicechat', (ws) => {
   console.log("🔌 WS konekcija otvorena");
+  let userText = '';
 
   ws.on('message', async (data) => {
-    if (data.toString() === 'END') {
+    if (data.toString().startsWith('TEXT:')) {
+      userText = data.toString().substring(5); // korisnička poruka
+
+      console.log("🎤 Korisnik rekao:", userText);
+
       try {
-        const userText = await getLatestMessageFromPHP();
-        if (!userText) {
-          ws.send("Greška: prazna poruka.");
-          return;
-        }
-
-        console.log("🎤 Korisnik rekao:", userText);
-
         const chat = await openai.chat.completions.create({
           messages: [{ role: 'user', content: userText }],
           model: 'gpt-4o'
@@ -46,16 +41,6 @@ app.ws('/voicechat', (ws) => {
     }
   });
 });
-
-async function getLatestMessageFromPHP() {
-  try {
-    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
-    return res.data.message;
-  } catch (err) {
-    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
-    return null;
-  }
-}
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
