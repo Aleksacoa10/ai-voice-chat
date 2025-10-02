@@ -52,7 +52,7 @@ app.ws('/voicechat', (ws) => {
               role: 'system',
               content: `Odgovaraj vrlo kratko i jasno, isključivo na srpskom jeziku.
               Ako korisnik pita za uslugu ili zaposlenog, koristi sledeći kontekst:
-              Usluge: ${context.services?.join(", ") || "nema"}
+              Usluge: ${(context.services || []).map(s => s.name).join(", ") || "nema"}
               Zaposleni: ${context.staff?.join(", ") || "nema"}`
             },
             { role: 'user', content: userText }
