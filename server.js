@@ -30,6 +30,7 @@ const db = mysql.createPool({
     console.log("✅ Konekcija sa bazom uspešna");
   } catch (err) {
     console.error("❌ Neuspešna konekcija sa bazom:", err.message);
+        console.log(err);
   }
 })();
 
