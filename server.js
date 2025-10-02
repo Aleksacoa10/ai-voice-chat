@@ -1,76 +1,47 @@
 require('dotenv').config();
-const fs = require('fs');
 const axios = require('axios');
-const FormData = require('form-data');
 const { OpenAI } = require('openai');
 const express = require('express');
-const http = require('http');
-const { Server } = require('ws');
+const expressWs = require('express-ws');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new Server({ server });
-
+expressWs(app); // enable WebSocket
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 🔗 Učitaj kontekst iz PHP API-ja
-async function getContextFromPHP() {
-  try {
-    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
-    return res.data.message || '';
-  } catch (err) {
-    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
-    return '';
-  }
-}
-
-server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WS server pokrenut (Whisper + TTS + get_latest_message.php)");
-});
-
-wss.on('connection', (ws) => {
+app.ws('/voicechat', (ws) => {
+  console.log("🔌 WS konekcija otvorena");
   let buffer = [];
 
   ws.on('message', async (data) => {
     if (data.toString() === 'END') {
-      const audioPath = './temp_input.webm';
-      fs.writeFileSync(audioPath, Buffer.concat(buffer));
-      buffer = [];
-
       try {
-        // 🔈 Whisper transkripcija
-        const formData = new FormData();
-        formData.append('file', fs.createReadStream(audioPath));
-        formData.append('model', 'whisper-1');
-        formData.append('language', 'sr');
+        const context = await getLatestMessageFromPHP();
+        if (!context?.message) {
+          ws.send("Greška: prazna poruka.");
+          return;
+        }
 
-        const whisperResp = await axios.post(
-          'https://api.openai.com/v1/audio/transcriptions',
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-              ...formData.getHeaders(),
-            }
-          }
-        );
+        console.log("🎤 Korisnik rekao:", context.message);
 
-        const userText = whisperResp.data.text;
-        console.log("🎤 Korisnik rekao:", userText);
-
-        const contextText = await getContextFromPHP();
-
+        // Chat sa kontekstom (usluge, zaposleni)
         const chat = await openai.chat.completions.create({
+          model: 'gpt-4o',
           messages: [
-            { role: 'system', content: contextText },
-            { role: 'user', content: userText }
-          ],
-          model: 'gpt-4o'
+            {
+              role: 'system',
+              content: `Odgovaraj vrlo kratko i jasno, isključivo na srpskom jeziku. 
+              Ako korisnik pita za uslugu ili zaposlenog, koristi sledeći kontekst:
+              Usluge: ${context.services?.join(", ") || "nema"}
+              Zaposleni: ${context.staff?.join(", ") || "nema"}`
+            },
+            { role: 'user', content: context.message }
+          ]
         });
 
         const botText = chat.choices[0].message.content;
         console.log("🤖 Bot odgovorio:", botText);
 
+        // TTS
         const ttsResp = await openai.audio.speech.create({
           model: "tts-1",
           voice: "onyx",
@@ -80,13 +51,27 @@ wss.on('connection', (ws) => {
         const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
         ws.send(audioBuffer);
       } catch (err) {
-        console.error("❌ Greška:", err);
+        console.error("❌ Greška:", err.response?.data || err.message);
         ws.send("Greška u obradi.");
       }
-
-      fs.unlinkSync(audioPath);
     } else {
       buffer.push(data);
     }
   });
+});
+
+async function getLatestMessageFromPHP() {
+  try {
+    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
+    return res.data; 
+    // očekuje { message: "...", services: [...], staff: [...] }
+  } catch (err) {
+    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
+    return null;
+  }
+}
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ WS server pokrenut na portu ${PORT}`);
 });
