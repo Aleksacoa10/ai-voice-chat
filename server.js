@@ -6,11 +6,22 @@ const { OpenAI } = require('openai');
 const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new Server({ server });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// 🔽 MySQL konekcija
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+});
 
 server.listen(process.env.PORT || 10000, () => {
   console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
@@ -44,6 +55,9 @@ wss.on('connection', (ws) => {
 
         const userText = whisperResp.data.text;
         console.log("🎤 Korisnik rekao:", userText);
+
+        // ❗ Primer SQL upita (npr. loguj poruku)
+        await db.query("INSERT INTO logs (text) VALUES (?)", [userText]);
 
         const chat = await openai.chat.completions.create({
           messages: [{ role: 'user', content: userText }],
