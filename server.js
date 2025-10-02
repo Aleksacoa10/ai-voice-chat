@@ -1,74 +1,28 @@
 require('dotenv').config();
 const fs = require('fs');
 const axios = require('axios');
-const FormData = require('form-data');
 const { OpenAI } = require('openai');
 const express = require('express');
-const http = require('http');
-const { Server } = require('ws');
-const mysql = require('mysql2/promise');
+const expressWs = require('express-ws');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new Server({ server });
+expressWs(app); // enable WebSocket
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 🔽 MySQL konekcija
-const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-});
-
-// 🔽 Test konekcije odmah pri startu
-(async () => {
-  try {
-    const [rows] = await db.query("SELECT 1");
-    console.log("✅ Konekcija sa bazom uspešna");
-  } catch (err) {
-    console.error("❌ Neuspešna konekcija sa bazom:", err.message);
-        console.log(err);
-  }
-})();
-
-server.listen(process.env.PORT || 10000, () => {
-  console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
-});
-
-wss.on('connection', (ws) => {
+app.ws('/voicechat', (ws) => {
+  console.log("🔌 WS konekcija otvorena");
   let buffer = [];
 
   ws.on('message', async (data) => {
     if (data.toString() === 'END') {
-      const audioPath = './temp_input.webm';
-      fs.writeFileSync(audioPath, Buffer.concat(buffer));
-      buffer = [];
-
       try {
-        const formData = new FormData();
-        formData.append('file', fs.createReadStream(audioPath));
-        formData.append('model', 'whisper-1');
-        formData.append('language', 'sr');
+        const userText = await getLatestMessageFromPHP();
+        if (!userText) {
+          ws.send("Greška: prazna poruka.");
+          return;
+        }
 
-        const whisperResp = await axios.post(
-          'https://api.openai.com/v1/audio/transcriptions',
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-              ...formData.getHeaders(),
-            }
-          }
-        );
-
-        const userText = whisperResp.data.text;
         console.log("🎤 Korisnik rekao:", userText);
-
-        // ❗ Primer SQL upita (npr. loguj poruku)
-        await db.query("INSERT INTO logs (text) VALUES (?)", [userText]);
 
         const chat = await openai.chat.completions.create({
           messages: [{ role: 'user', content: userText }],
@@ -90,10 +44,23 @@ wss.on('connection', (ws) => {
         console.error("❌ Greška:", err.response?.data || err.message);
         ws.send("Greška u obradi.");
       }
-
-      fs.unlinkSync(audioPath);
     } else {
       buffer.push(data);
     }
   });
+});
+
+async function getLatestMessageFromPHP() {
+  try {
+    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
+    return res.data.message;
+  } catch (err) {
+    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
+    return null;
+  }
+}
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ WS server pokrenut na portu ${PORT}`);
 });
