@@ -6,12 +6,11 @@ const express = require('express');
 const expressWs = require('express-ws');
 
 const app = express();
-expressWs(app); // enable WebSocket
+expressWs(app);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.ws('/voicechat', (ws) => {
   console.log("🔌 WS konekcija otvorena");
-  let buffer = [];
 
   ws.on('message', async (data) => {
     if (data.toString() === 'END') {
@@ -44,8 +43,6 @@ app.ws('/voicechat', (ws) => {
         console.error("❌ Greška:", err.response?.data || err.message);
         ws.send("Greška u obradi.");
       }
-    } else {
-      buffer.push(data);
     }
   });
 });
