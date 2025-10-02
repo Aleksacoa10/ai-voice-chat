@@ -23,6 +23,16 @@ const db = mysql.createPool({
   connectionLimit: 10,
 });
 
+// 🔽 Test konekcije odmah pri startu
+(async () => {
+  try {
+    const [rows] = await db.query("SELECT 1");
+    console.log("✅ Konekcija sa bazom uspešna");
+  } catch (err) {
+    console.error("❌ Neuspešna konekcija sa bazom:", err.message);
+  }
+})();
+
 server.listen(process.env.PORT || 10000, () => {
   console.log("🟢 WebSocket server je pokrenut (OpenAI TTS)");
 });
