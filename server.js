@@ -6,6 +6,12 @@ const { Server } = require('ws');
 const { OpenAI } = require('openai');
 const axios = require('axios');
 const { exec } = require('child_process');
+const textToSpeech = require('@google-cloud/text-to-speech');
+
+const ttsClient = new textToSpeech.TextToSpeechClient({
+  keyFilename: '/home/planirajrs/credentials/elated-bebop-473819-e1-34f6b8bb4fd8.json'
+});
+
 
 const app = express();
 const server = http.createServer(app);
@@ -58,17 +64,13 @@ wss.on('connection', (ws) => {
         const reply = completion.choices[0].message.content;
         console.log('🤖 GPT:', reply);
 
-        const ttsRes = await axios.post(
-          'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + process.env.GOOGLE_API_KEY,
-          {
-            input: { text: reply },
-            voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
-            audioConfig: { audioEncoding: 'MP3' }
-          }
-        );
+        const [response] = await ttsClient.synthesizeSpeech({
+          input: { text: reply },
+          voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
+          audioConfig: { audioEncoding: 'MP3' },
+        });
 
-        const audioBuffer = Buffer.from(ttsRes.data.audioContent, 'base64');
-        ws.send(audioBuffer);
+        ws.send(response.audioContent);
 
         fs.unlinkSync(filename);
         fs.unlinkSync(mp3file);
@@ -80,7 +82,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log('🔌 Klijent se diskonektovao');
   });
-}); 
+});
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
