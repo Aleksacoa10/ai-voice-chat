@@ -58,7 +58,7 @@ wss.on('connection', (ws) => {
         console.log('🤖 GPT:', reply);
 
 const ttsRes = await axios.post(
-  'https://api.elevenlabs.io/v1/text-to-speech/G17SuINrv2H9FC6nvetn',
+  'https://api.elevenlabs.io/v1/text-to-speech/G17SuINrv2H9FC6nvetn/stream',
   {
     text: reply,
     model_id: 'eleven_multilingual_v2',
@@ -69,7 +69,7 @@ const ttsRes = await axios.post(
   },
   {
     headers: {
-      'xi-api-key': process.env.ELEVENLABS_API_KEY,
+      'Authorization': `Bearer ${process.env.ELEVENLABS_API_KEY}`,
       'Content-Type': 'application/json'
     },
     responseType: 'arraybuffer'
