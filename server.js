@@ -1,16 +1,20 @@
-// server.js
 const fs = require('fs');
+const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
 const { OpenAI } = require('openai');
 const axios = require('axios');
 const { exec } = require('child_process');
-const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new Server({ server });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const server = http.createServer();
-const wss = new Server({ server });
+app.get('/', (req, res) => {
+  res.send("✅ WebSocket server radi.");
+});
 
 wss.on('connection', (ws) => {
   console.log('🔌 Klijent povezan');
@@ -20,14 +24,12 @@ wss.on('connection', (ws) => {
 
   ws.on('message', async (data) => {
     buffer.push(data);
-
     clearTimeout(timeout);
     timeout = setTimeout(async () => {
       const raw = Buffer.concat(buffer);
       const filename = `audio-${Date.now()}.webm`;
       fs.writeFileSync(filename, raw);
 
-      // Konvertuj u mp3 (Whisper bolje radi sa tim)
       const mp3file = filename.replace('.webm', '.mp3');
       exec(`ffmpeg -i ${filename} -ar 16000 -ac 1 ${mp3file}`, async (err) => {
         if (err) return ws.send('❌ Greška pri konverziji');
@@ -41,7 +43,6 @@ wss.on('connection', (ws) => {
         const userText = transcript.text;
         console.log('🎤 Korisnik rekao:', userText);
 
-        // Dobavi kontekst iz tvoje baze
         const contextRes = await axios.get('https://planiraj.me/api/get_context.php');
 
         const completion = await openai.chat.completions.create({
@@ -55,7 +56,6 @@ wss.on('connection', (ws) => {
         const reply = completion.choices[0].message.content;
         console.log('🤖 GPT:', reply);
 
-        // Generiši govor preko Google TTS (primer: ElevenLabs izostavljen)
         const ttsRes = await axios.post('https://texttospeech.googleapis.com/v1/text:synthesize?key=' + process.env.GOOGLE_API_KEY, {
           input: { text: reply },
           voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
@@ -69,7 +69,7 @@ wss.on('connection', (ws) => {
         fs.unlinkSync(mp3file);
         buffer = [];
       });
-    }, 800); // čekaj 800ms tišine pre obrade
+    }, 800);
   });
 
   ws.on('close', () => {
@@ -77,6 +77,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(process.env.PORT || 10000, () => {
-  console.log('🟢 WebSocket server pokrenut');
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+  console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
 });
