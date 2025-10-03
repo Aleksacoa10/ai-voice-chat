@@ -57,14 +57,20 @@ wss.on('connection', (ws) => {
         const reply = completion.choices[0].message.content;
         console.log('🤖 GPT:', reply);
 
-        const ttsRes = await axios.post('https://texttospeech.googleapis.com/v1/text:synthesize?key=' + process.env.GOOGLE_API_KEY, {
-          input: { text: reply },
-          voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
-          audioConfig: { audioEncoding: 'MP3' }
-        });
+const ttsRes = await axios.post('https://api.elevenlabs.io/v1/text-to-speech/convert', {
+  text: reply,
+  model_id: "eleven_multilingual_v2",
+  language_code: "sr",
+  voice_settings: {}
+}, {
+  headers: {
+    'xi-api-key': process.env.ELEVENLABS_API_KEY
+  },
+  responseType: 'arraybuffer' // OVO DODAJ
+});
 
-        const audioBuffer = Buffer.from(ttsRes.data.audioContent, 'base64');
-        ws.send(audioBuffer);
+const audioBuffer = Buffer.from(ttsRes.data); // NEMA base64
+ws.send(audioBuffer);
 
         fs.unlinkSync(filename);
         fs.unlinkSync(mp3file);
