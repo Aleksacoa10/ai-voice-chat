@@ -9,7 +9,17 @@ const axios = require('axios');
 const { exec } = require('child_process');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const ttsClient = new textToSpeech.TextToSpeechClient();
+
+const ttsClient = new textToSpeech.TextToSpeechClient({
+  keyFilename: '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json'
+});
+
+ttsClient.getProjectId().then(id => {
+  console.log("✅ Google TTS povezan, project ID:", id);
+}).catch(err => {
+  console.error("❌ Problem sa TTS autentifikacijom:", err);
+});
+
 
 
 const app = express();
