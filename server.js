@@ -9,7 +9,7 @@ const { exec } = require('child_process');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
 const ttsClient = new textToSpeech.TextToSpeechClient({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+  keyFilename: '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json'
 });
 
 
