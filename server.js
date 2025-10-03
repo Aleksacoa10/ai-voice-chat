@@ -8,7 +8,10 @@ const axios = require('axios');
 const { exec } = require('child_process');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const ttsClient = new textToSpeech.TextToSpeechClient();
+const ttsClient = new textToSpeech.TextToSpeechClient({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+});
+
 
 
 
