@@ -26,6 +26,7 @@ wss.on('connection', (ws) => {
   ws.on('message', async (data) => {
     buffer.push(data);
     clearTimeout(timeout);
+
     timeout = setTimeout(async () => {
       const raw = Buffer.concat(buffer);
       const filename = `audio-${Date.now()}.webm`;
@@ -57,28 +58,17 @@ wss.on('connection', (ws) => {
         const reply = completion.choices[0].message.content;
         console.log('🤖 GPT:', reply);
 
-const ttsRes = await axios.post(
-  'https://api.elevenlabs.io/v1/text-to-speech/G17SuINrv2H9FC6nvetn/stream',
-  {
-    text: reply,
-    model_id: 'eleven_multilingual_v2',
-    voice_settings: {
-      stability: 0.5,
-      similarity_boost: 0.5
-    }
-  },
-  {
-    headers: {
-      'Authorization': `Bearer ${process.env.ELEVENLABS_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    responseType: 'arraybuffer'
-  }
-);
+        const ttsRes = await axios.post(
+          'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + process.env.GOOGLE_API_KEY,
+          {
+            input: { text: reply },
+            voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
+            audioConfig: { audioEncoding: 'MP3' }
+          }
+        );
 
-
-const audioBuffer = Buffer.from(ttsRes.data); // NEMA base64
-ws.send(audioBuffer);
+        const audioBuffer = Buffer.from(ttsRes.data.audioContent, 'base64');
+        ws.send(audioBuffer);
 
         fs.unlinkSync(filename);
         fs.unlinkSync(mp3file);
