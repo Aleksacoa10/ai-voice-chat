@@ -1,5 +1,4 @@
 require('dotenv').config();
-process.env.GOOGLE_APPLICATION_CREDENTIALS = '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json';
 
 const fs = require('fs');
 const express = require('express');
