@@ -80,7 +80,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     console.log('🔌 Klijent se diskonektovao');
   });
-});
+}); 
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
