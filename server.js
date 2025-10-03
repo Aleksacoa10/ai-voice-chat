@@ -1,4 +1,6 @@
 require('dotenv').config();
+process.env.GOOGLE_APPLICATION_CREDENTIALS = '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json';
+
 const fs = require('fs');
 const express = require('express');
 const http = require('http');
@@ -8,11 +10,7 @@ const axios = require('axios');
 const { exec } = require('child_process');
 const textToSpeech = require('@google-cloud/text-to-speech');
 
-const ttsClient = new textToSpeech.TextToSpeechClient({
-  keyFilename: '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json'
-});
-
-
+const ttsClient = new textToSpeech.TextToSpeechClient();
 
 
 const app = express();
