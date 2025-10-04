@@ -1,3 +1,6 @@
+process.env.GOOGLE_API_USE_CLIENT_CERTIFICATE = 'false';
+
+
 require('dotenv').config();
 
 const fs = require('fs');
@@ -14,7 +17,6 @@ const ttsClient = new textToSpeech.TextToSpeechClient({
   credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
   projectId: "elated-bebop-473819-e1"
 });
-;
 
 
 ttsClient.getProjectId().then(id => {
