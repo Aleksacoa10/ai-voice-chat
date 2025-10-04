@@ -11,8 +11,9 @@ const textToSpeech = require('@google-cloud/text-to-speech');
 
 
 const ttsClient = new textToSpeech.TextToSpeechClient({
-  keyFilename: '/etc/secrets/elated-bebop-473819-e1-34f6b8bb4fd8.json'
+  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS)
 });
+
 
 ttsClient.getProjectId().then(id => {
   console.log("✅ Google TTS povezan, project ID:", id);
