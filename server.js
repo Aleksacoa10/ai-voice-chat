@@ -1,104 +1,100 @@
-process.env.GOOGLE_API_USE_CLIENT_CERTIFICATE = 'false';
-
-
 require('dotenv').config();
-
 const fs = require('fs');
-const express = require('express');
-const http = require('http');
-const { Server } = require('ws');
-const { OpenAI } = require('openai');
 const axios = require('axios');
-const { exec } = require('child_process');
-const textToSpeech = require('@google-cloud/text-to-speech');
-
-
-const ttsClient = new textToSpeech.TextToSpeechClient({
-  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
-  projectId: "elated-bebop-473819-e1"
-});
-
-
-ttsClient.getProjectId().then(id => {
-  console.log("✅ Google TTS povezan, project ID:", id);
-}).catch(err => {
-  console.error("❌ Problem sa TTS autentifikacijom:", err);
-});
-
-
+const FormData = require('form-data');
+const { OpenAI } = require('openai');
+const express = require('express');
+const expressWs = require('express-ws');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new Server({ server });
-
+expressWs(app);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.get('/', (req, res) => {
-  res.send("✅ WebSocket server radi.");
-});
-
-wss.on('connection', (ws) => {
-  console.log('🔌 Klijent povezan');
-
+app.ws('/voicechat', (ws) => {
+  console.log("🔌 WS konekcija otvorena");
   let buffer = [];
-  let timeout;
 
   ws.on('message', async (data) => {
-    buffer.push(data);
-    clearTimeout(timeout);
+    if (data.toString() === 'END') {
+      const audioPath = './temp_input.webm';
+      fs.writeFileSync(audioPath, Buffer.concat(buffer));
+      buffer = [];
 
-    timeout = setTimeout(async () => {
-      const raw = Buffer.concat(buffer);
-      const filename = `audio-${Date.now()}.webm`;
-      fs.writeFileSync(filename, raw);
+      try {
+        // 🎙️ Whisper STT
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(audioPath));
+        formData.append('model', 'whisper-1');
+        formData.append('language', 'sr');
 
-      const mp3file = filename.replace('.webm', '.mp3');
-      exec(`ffmpeg -i ${filename} -ar 16000 -ac 1 ${mp3file}`, async (err) => {
-        if (err) return ws.send('❌ Greška pri konverziji');
+        const whisperResp = await axios.post(
+          'https://api.openai.com/v1/audio/transcriptions',
+          formData,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+              ...formData.getHeaders(),
+            }
+          }
+        );
 
-        const transcript = await openai.audio.transcriptions.create({
-          file: fs.createReadStream(mp3file),
-          model: 'whisper-1',
-          language: 'sr'
-        });
+        const userText = whisperResp.data.text;
+        console.log("🎤 Korisnik rekao:", userText);
 
-        const userText = transcript.text;
-        console.log('🎤 Korisnik rekao:', userText);
+        // 🔁 Uzimamo dodatni kontekst (PHP endpoint)
+        const context = await getLatestMessageFromPHP();
 
-        const contextRes = await axios.get('https://planiraj.me/api/get_context.php');
-
-        const completion = await openai.chat.completions.create({
+        // 💬 Chat
+        const chat = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: 'Ti si pametni asistent za zakazivanje termina.' },
-            { role: 'user', content: `${userText}\n\nDostupni kontekst:\n${JSON.stringify(contextRes.data)}` }
+            {
+              role: 'system',
+              content: `Odgovaraj vrlo kratko i jasno, isključivo na srpskom jeziku.
+              Ako korisnik pita za uslugu ili zaposlenog, koristi sledeći kontekst:
+              Usluge: ${(context.services || []).map(s => s.name).join(", ") || "nema"}
+              Zaposleni: ${context.staff?.join(", ") || "nema"}`
+            },
+            { role: 'user', content: userText }
           ]
         });
 
-        const reply = completion.choices[0].message.content;
-        console.log('🤖 GPT:', reply);
+        const botText = chat.choices[0].message.content;
+        console.log("🤖 Bot odgovorio:", botText);
 
-        const [response] = await ttsClient.synthesizeSpeech({
-          input: { text: reply },
-          voice: { languageCode: 'sr-RS', name: 'sr-RS-Standard-A' },
-          audioConfig: { audioEncoding: 'MP3' },
+        // 🔊 TTS
+        const ttsResp = await openai.audio.speech.create({
+          model: "tts-1",
+          voice: "onyx",
+          input: botText
         });
 
-        ws.send(response.audioContent);
+        const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
+        ws.send(audioBuffer);
+      } catch (err) {
+        console.error("❌ Greška:", err.response?.data || err.message);
+        ws.send("Greška u obradi.");
+      }
 
-        fs.unlinkSync(filename);
-        fs.unlinkSync(mp3file);
-        buffer = [];
-      });
-    }, 800);
-  });
-
-  ws.on('close', () => {
-    console.log('🔌 Klijent se diskonektovao');
+      fs.unlinkSync(audioPath); // obriši temp fajl
+    } else {
+      buffer.push(data);
+    }
   });
 });
 
+async function getLatestMessageFromPHP() {
+  try {
+    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
+    return res.data; 
+    // očekuje { message: "...", services: [...], staff: [...] }
+  } catch (err) {
+    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
+    return { services: [], staff: [] };
+  }
+}
+
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => {
-  console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`✅ WS server pokrenut na portu ${PORT}`);
 });
