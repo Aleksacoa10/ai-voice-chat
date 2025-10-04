@@ -11,8 +11,10 @@ const textToSpeech = require('@google-cloud/text-to-speech');
 
 
 const ttsClient = new textToSpeech.TextToSpeechClient({
-  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS)
+  credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+  projectId: "elated-bebop-473819-e1"
 });
+;
 
 
 ttsClient.getProjectId().then(id => {
