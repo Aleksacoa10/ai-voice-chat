@@ -31,6 +31,7 @@ wss.on('connection', (ws, req) => {
 
   let audioBuffers = [];
   let isProcessing = false;
+  let lastTtsSentAt = 0;
 
   ws.on('message', async (data, isBinary) => {
     console.log('MESSAGE ARRIVED:', isBinary ? 'binary' : data.toString());
@@ -85,6 +86,20 @@ wss.on('connection', (ws, req) => {
       audioBuffers = [];
 
       console.log('TOTAL AUDIO SIZE:', raw.length);
+
+      if (Date.now() - lastTtsSentAt < 1200) {
+        console.log('IGNORED: audio arrived too soon after TTS');
+        isProcessing = false;
+        ws.send(JSON.stringify({ type: 'ready_for_next' }));
+        return;
+      }
+
+      if (raw.length < 12000) {
+        console.log('IGNORED: audio too short/noisy', raw.length);
+        isProcessing = false;
+        ws.send(JSON.stringify({ type: 'ready_for_next' }));
+        return;
+      }
 
       const filename = path.join(os.tmpdir(), `audio-${Date.now()}.webm`);
       fs.writeFileSync(filename, raw);
@@ -202,6 +217,7 @@ wss.on('connection', (ws, req) => {
         console.log('SENDING AUDIO BACK:', audioBuffer.length);
 
         ws.send(audioBuffer, { binary: true });
+        lastTtsSentAt = Date.now();
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
@@ -226,6 +242,7 @@ wss.on('connection', (ws, req) => {
     console.log('🔌 Klijent se diskonektovao');
     audioBuffers = [];
     isProcessing = false;
+    lastTtsSentAt = 0;
   });
 });
 
