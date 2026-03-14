@@ -45,7 +45,7 @@ const PHP_CHATBOT_URL =
   DIREKTNO UBACI TVOJ KEY OVDE
   Nemoj ovaj key nikad stavljati u frontend/browser.
 */
-const HEYGEN_API_KEY = 'sk_V2_hgu_k0FUsXWrwho_ErFXEb7nB9M8HQeHPcRI8qTvBk9tLIjZ';
+const HEYGEN_API_KEY = 'ccb2d8dd-5f47-4d52-aec3-1f01d6fc5f4b';
 
 app.get('/', (req, res) => {
   res.send('✅ WebSocket server radi.');
@@ -57,7 +57,7 @@ app.get('/', (req, res) => {
 app.get('/api/heygen-token', async (req, res) => {
   try {
     const r = await axios.post(
-      'https://api.heygen.com/v1/streaming.create_token',
+      'https://api.liveavatar.com/v1/sessions/token',
       {},
       {
         headers: {
