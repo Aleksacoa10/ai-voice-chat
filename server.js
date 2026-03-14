@@ -7,7 +7,7 @@ const http = require('http');
 const { Server } = require('ws');
 const { OpenAI } = require('openai');
 const axios = require('axios');
-const cors = require('cors');
+
 function cyrToLat(text) {
   const map = {
     А:'A', а:'a', Б:'B', б:'b', В:'V', в:'v', Г:'G', г:'g',
@@ -24,67 +24,15 @@ function cyrToLat(text) {
 }
 
 const app = express();
-app.use(cors({
-  origin: 'https://planiraj.me',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  credentials: true
-}));
-
-app.options('*', cors());
 const server = http.createServer(app);
 const wss = new Server({ server });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const PHP_CHATBOT_URL =
-  process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
-
-/*
-  DIREKTNO UBACI TVOJ KEY OVDE
-  Nemoj ovaj key nikad stavljati u frontend/browser.
-*/
-const HEYGEN_API_KEY = 'ccb2d8dd-5f47-4d52-aec3-1f01d6fc5f4b';
+const PHP_CHATBOT_URL = process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
 
 app.get('/', (req, res) => {
   res.send('✅ WebSocket server radi.');
-});
-
-/*
-  HeyGen session token za frontend
-*/
-app.get('/api/heygen-token', async (req, res) => {
-  try {
-    const r = await axios.post(
-      'https://api.liveavatar.com/v1/sessions/token',
-      {
-        mode: 'LITE',
-        avatar_id: 'OVDE_TVAS_LIVEAVATAR_ID',
-        avatar_persona: {
-          voice_id: 'OVDE_TVAS_VOICE_ID',
-          language: 'sr'
-        }
-      },
-      {
-        headers: {
-          'X-API-KEY': HEYGEN_API_KEY,
-          'accept': 'application/json',
-          'content-type': 'application/json'
-        },
-        timeout: 20000
-      }
-    );
-
-    console.log('LIVEAVATAR TOKEN OK:', r.data);
-    res.json(r.data);
-  } catch (err) {
-    console.error('❌ LIVEAVATAR token greška FULL:', err.response?.data || err.message || err);
-    res.status(500).json({
-      error: 'liveavatar_token_failed',
-      details: err.response?.data || err.message
-    });
-  }
 });
 
 wss.on('connection', (ws, req) => {
@@ -146,30 +94,26 @@ wss.on('connection', (ws, req) => {
           language: 'sr'
         });
 
-        transcriptText = cyrToLat((transcript.text || '').trim());
+transcriptText = cyrToLat((transcript.text || '').trim());
         console.log('TRANSCRIPT TEXT:', transcriptText);
       } catch (err) {
         console.error('❌ Greška transkripcije FULL:', err);
-
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-
-        if (fs.existsSync(filename)) fs.unlinkSync(filename);
+        fs.existsSync(filename) && fs.unlinkSync(filename);
         return;
       }
 
-      if (fs.existsSync(filename)) fs.unlinkSync(filename);
+      fs.existsSync(filename) && fs.unlinkSync(filename);
 
       if (!transcriptText) {
         console.log('EMPTY TRANSCRIPT');
-
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-
         return;
       }
 
@@ -201,12 +145,10 @@ wss.on('connection', (ws, req) => {
         console.log('PHP DATA:', phpData);
       } catch (err) {
         console.error('❌ Greška chatbot_gpt.php FULL:', err.response?.data || err.message || err);
-
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Greška pri obradi zahteva.'
         }));
-
         return;
       }
 
@@ -221,13 +163,24 @@ wss.on('connection', (ws, req) => {
         slots: Array.isArray(phpData.slots) ? phpData.slots : []
       }));
 
-      /*
-        NEMA VIŠE OPENAI TTS OVDE
-        HeyGen će govoriti na frontendu
-      */
+      try {
+        console.log('TTS START:', reply);
+
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: 'alloy',
+          input: reply
+        });
+
+        const audioBuffer = Buffer.from(await speech.arrayBuffer());
+        console.log('SENDING AUDIO BACK:', audioBuffer.length);
+
+        ws.send(audioBuffer, { binary: true });
+      } catch (err) {
+        console.error('❌ Greška TTS FULL:', err);
+      }
     } catch (err) {
       console.error('❌ WS greška FULL:', err);
-
       ws.send(JSON.stringify({
         type: 'reply',
         text: 'Greška pri glasovnoj komunikaciji.'
