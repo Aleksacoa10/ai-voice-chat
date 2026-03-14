@@ -14,7 +14,8 @@ const wss = new Server({ server });
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const PHP_CHATBOT_URL = process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
+const PHP_CHATBOT_URL =
+  process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
 
 app.get('/', (req, res) => {
   res.send('✅ WebSocket server radi.');
@@ -29,15 +30,24 @@ wss.on('connection', (ws, req) => {
   console.log('PHP SESSION ID:', phpSessionId);
 
   let audioBuffers = [];
+  let isProcessing = false;
 
   ws.on('message', async (data, isBinary) => {
     console.log('MESSAGE ARRIVED:', isBinary ? 'binary' : data.toString());
 
     try {
       if (isBinary) {
+        if (isProcessing) {
+          console.log('IGNORED BINARY: already processing');
+          return;
+        }
+
         const chunk = Buffer.from(data);
         console.log('BINARY CHUNK SIZE:', chunk.length);
-        audioBuffers.push(chunk);
+
+        if (chunk.length > 0) {
+          audioBuffers.push(chunk);
+        }
         return;
       }
 
@@ -52,12 +62,24 @@ wss.on('connection', (ws, req) => {
 
       if (msg?.type !== 'end') return;
 
+      if (isProcessing) {
+        console.log('IGNORED END: already processing');
+        return;
+      }
+
       console.log('END RECEIVED');
 
       if (!audioBuffers.length) {
         console.log('NO AUDIO BUFFERS');
+        ws.send(JSON.stringify({
+          type: 'reply',
+          text: 'Nisam vas dobro razumeo. Možete ponoviti?'
+        }));
         return;
       }
+
+      isProcessing = true;
+      ws.send(JSON.stringify({ type: 'processing' }));
 
       const raw = Buffer.concat(audioBuffers);
       audioBuffers = [];
@@ -83,22 +105,35 @@ wss.on('connection', (ws, req) => {
         console.log('TRANSCRIPT TEXT:', transcriptText);
       } catch (err) {
         console.error('❌ Greška transkripcije FULL:', err);
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-        fs.existsSync(filename) && fs.unlinkSync(filename);
+
+        if (fs.existsSync(filename)) {
+          fs.unlinkSync(filename);
+        }
+
+        isProcessing = false;
+        ws.send(JSON.stringify({ type: 'ready_for_next' }));
         return;
       }
 
-      fs.existsSync(filename) && fs.unlinkSync(filename);
+      if (fs.existsSync(filename)) {
+        fs.unlinkSync(filename);
+      }
 
       if (!transcriptText) {
         console.log('EMPTY TRANSCRIPT');
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
+
+        isProcessing = false;
+        ws.send(JSON.stringify({ type: 'ready_for_next' }));
         return;
       }
 
@@ -129,16 +164,22 @@ wss.on('connection', (ws, req) => {
         phpData = phpRes.data || {};
         console.log('PHP DATA:', phpData);
       } catch (err) {
-        console.error('❌ Greška chatbot_gpt.php FULL:', err.response?.data || err.message || err);
+        console.error(
+          '❌ Greška chatbot_gpt.php FULL:',
+          err.response?.data || err.message || err
+        );
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Greška pri obradi zahteva.'
         }));
+
+        isProcessing = false;
+        ws.send(JSON.stringify({ type: 'ready_for_next' }));
         return;
       }
 
       const reply = String(phpData.reply || 'Došlo je do greške.').trim();
-
       console.log('🤖 PHP reply:', reply);
 
       ws.send(JSON.stringify({
@@ -164,18 +205,27 @@ wss.on('connection', (ws, req) => {
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
+
+      isProcessing = false;
+      ws.send(JSON.stringify({ type: 'ready_for_next' }));
     } catch (err) {
       console.error('❌ WS greška FULL:', err);
+      isProcessing = false;
+      audioBuffers = [];
+
       ws.send(JSON.stringify({
         type: 'reply',
         text: 'Greška pri glasovnoj komunikaciji.'
       }));
+
+      ws.send(JSON.stringify({ type: 'ready_for_next' }));
     }
   });
 
   ws.on('close', () => {
     console.log('🔌 Klijent se diskonektovao');
     audioBuffers = [];
+    isProcessing = false;
   });
 });
 
