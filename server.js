@@ -131,7 +131,7 @@ transcriptText = cyrToLat((transcript.text || '').trim());
 
         const phpRes = await axios.post(
           PHP_CHATBOT_URL,
-          { message: transcriptText, source: 'voice' },
+          { message: transcriptText },
           {
             headers: {
               'Content-Type': 'application/json',
