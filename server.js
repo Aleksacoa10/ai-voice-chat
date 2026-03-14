@@ -24,6 +24,13 @@ function cyrToLat(text) {
 }
 
 const app = express();
+app.use(cors({
+  origin: 'https://planiraj.me',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
+}));
+
+app.options('*', cors());
 const server = http.createServer(app);
 const wss = new Server({ server });
 
