@@ -7,7 +7,7 @@ const http = require('http');
 const { Server } = require('ws');
 const { OpenAI } = require('openai');
 const axios = require('axios');
-
+const cors = require('cors');
 function cyrToLat(text) {
   const map = {
     А:'A', а:'a', Б:'B', б:'b', В:'V', в:'v', Г:'G', г:'g',
@@ -38,7 +38,7 @@ const PHP_CHATBOT_URL =
   DIREKTNO UBACI TVOJ KEY OVDE
   Nemoj ovaj key nikad stavljati u frontend/browser.
 */
-const HEYGEN_API_KEY = 'OVDE_TVOJ_HEYGEN_API_KEY';
+const HEYGEN_API_KEY = 'sk_V2_hgu_k0FUsXWrwho_ErFXEb7nB9M8HQeHPcRI8qTvBk9tLIjZ';
 
 app.get('/', (req, res) => {
   res.send('✅ WebSocket server radi.');
