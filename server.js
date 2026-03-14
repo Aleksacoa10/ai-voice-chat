@@ -58,21 +58,30 @@ app.get('/api/heygen-token', async (req, res) => {
   try {
     const r = await axios.post(
       'https://api.liveavatar.com/v1/sessions/token',
-      {},
+      {
+        mode: 'LITE',
+        avatar_id: 'OVDE_TVAS_LIVEAVATAR_ID',
+        avatar_persona: {
+          voice_id: 'OVDE_TVAS_VOICE_ID',
+          language: 'sr'
+        }
+      },
       {
         headers: {
-          'x-api-key': HEYGEN_API_KEY,
-          'Content-Type': 'application/json'
+          'X-API-KEY': HEYGEN_API_KEY,
+          'accept': 'application/json',
+          'content-type': 'application/json'
         },
         timeout: 20000
       }
     );
 
+    console.log('LIVEAVATAR TOKEN OK:', r.data);
     res.json(r.data);
   } catch (err) {
-    console.error('❌ HeyGen token greška:', err.response?.data || err.message || err);
+    console.error('❌ LIVEAVATAR token greška FULL:', err.response?.data || err.message || err);
     res.status(500).json({
-      error: 'heygen_token_failed',
+      error: 'liveavatar_token_failed',
       details: err.response?.data || err.message
     });
   }
