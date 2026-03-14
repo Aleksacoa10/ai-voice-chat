@@ -27,12 +27,48 @@ const app = express();
 const server = http.createServer(app);
 const wss = new Server({ server });
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
-const PHP_CHATBOT_URL = process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
+const PHP_CHATBOT_URL =
+  process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
+
+/*
+  DIREKTNO UBACI TVOJ KEY OVDE
+  Nemoj ovaj key nikad stavljati u frontend/browser.
+*/
+const HEYGEN_API_KEY = 'OVDE_TVOJ_HEYGEN_API_KEY';
 
 app.get('/', (req, res) => {
   res.send('✅ WebSocket server radi.');
+});
+
+/*
+  HeyGen session token za frontend
+*/
+app.get('/api/heygen-token', async (req, res) => {
+  try {
+    const r = await axios.post(
+      'https://api.heygen.com/v1/streaming.create_token',
+      {},
+      {
+        headers: {
+          'x-api-key': HEYGEN_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        timeout: 20000
+      }
+    );
+
+    res.json(r.data);
+  } catch (err) {
+    console.error('❌ HeyGen token greška:', err.response?.data || err.message || err);
+    res.status(500).json({
+      error: 'heygen_token_failed',
+      details: err.response?.data || err.message
+    });
+  }
 });
 
 wss.on('connection', (ws, req) => {
@@ -94,26 +130,30 @@ wss.on('connection', (ws, req) => {
           language: 'sr'
         });
 
-transcriptText = cyrToLat((transcript.text || '').trim());
+        transcriptText = cyrToLat((transcript.text || '').trim());
         console.log('TRANSCRIPT TEXT:', transcriptText);
       } catch (err) {
         console.error('❌ Greška transkripcije FULL:', err);
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-        fs.existsSync(filename) && fs.unlinkSync(filename);
+
+        if (fs.existsSync(filename)) fs.unlinkSync(filename);
         return;
       }
 
-      fs.existsSync(filename) && fs.unlinkSync(filename);
+      if (fs.existsSync(filename)) fs.unlinkSync(filename);
 
       if (!transcriptText) {
         console.log('EMPTY TRANSCRIPT');
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
+
         return;
       }
 
@@ -145,10 +185,12 @@ transcriptText = cyrToLat((transcript.text || '').trim());
         console.log('PHP DATA:', phpData);
       } catch (err) {
         console.error('❌ Greška chatbot_gpt.php FULL:', err.response?.data || err.message || err);
+
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Greška pri obradi zahteva.'
         }));
+
         return;
       }
 
@@ -163,24 +205,13 @@ transcriptText = cyrToLat((transcript.text || '').trim());
         slots: Array.isArray(phpData.slots) ? phpData.slots : []
       }));
 
-      try {
-        console.log('TTS START:', reply);
-
-        const speech = await openai.audio.speech.create({
-          model: 'gpt-4o-mini-tts',
-          voice: 'alloy',
-          input: reply
-        });
-
-        const audioBuffer = Buffer.from(await speech.arrayBuffer());
-        console.log('SENDING AUDIO BACK:', audioBuffer.length);
-
-        ws.send(audioBuffer, { binary: true });
-      } catch (err) {
-        console.error('❌ Greška TTS FULL:', err);
-      }
+      /*
+        NEMA VIŠE OPENAI TTS OVDE
+        HeyGen će govoriti na frontendu
+      */
     } catch (err) {
       console.error('❌ WS greška FULL:', err);
+
       ws.send(JSON.stringify({
         type: 'reply',
         text: 'Greška pri glasovnoj komunikaciji.'
