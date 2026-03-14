@@ -1,100 +1,185 @@
 require('dotenv').config();
 const fs = require('fs');
-const axios = require('axios');
-const FormData = require('form-data');
-const { OpenAI } = require('openai');
+const os = require('os');
+const path = require('path');
 const express = require('express');
-const expressWs = require('express-ws');
+const http = require('http');
+const { Server } = require('ws');
+const { OpenAI } = require('openai');
+const axios = require('axios');
 
 const app = express();
-expressWs(app);
+const server = http.createServer(app);
+const wss = new Server({ server });
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.ws('/voicechat', (ws) => {
-  console.log("🔌 WS konekcija otvorena");
-  let buffer = [];
+const PHP_CHATBOT_URL = process.env.PHP_CHATBOT_URL || 'https://planiraj.me/api/chatbot_gpt.php';
 
-  ws.on('message', async (data) => {
-    if (data.toString() === 'END') {
-      const audioPath = './temp_input.webm';
-      fs.writeFileSync(audioPath, Buffer.concat(buffer));
-      buffer = [];
+app.get('/', (req, res) => {
+  res.send('✅ WebSocket server radi.');
+});
+
+wss.on('connection', (ws, req) => {
+  console.log('🔌 Klijent povezan');
+  console.log('REQ URL:', req.url);
+
+  const url = new URL(req.url, 'http://localhost');
+  const phpSessionId = url.searchParams.get('php_session_id') || '';
+  console.log('PHP SESSION ID:', phpSessionId);
+
+  let audioBuffers = [];
+
+  ws.on('message', async (data, isBinary) => {
+    console.log('MESSAGE ARRIVED:', isBinary ? 'binary' : data.toString());
+
+    try {
+      if (isBinary) {
+        const chunk = Buffer.from(data);
+        console.log('BINARY CHUNK SIZE:', chunk.length);
+        audioBuffers.push(chunk);
+        return;
+      }
+
+      let msg = null;
+      try {
+        msg = JSON.parse(data.toString());
+      } catch {
+        msg = null;
+      }
+
+      console.log('PARSED MSG:', msg);
+
+      if (msg?.type !== 'end') return;
+
+      console.log('END RECEIVED');
+
+      if (!audioBuffers.length) {
+        console.log('NO AUDIO BUFFERS');
+        return;
+      }
+
+      const raw = Buffer.concat(audioBuffers);
+      audioBuffers = [];
+
+      console.log('TOTAL AUDIO SIZE:', raw.length);
+
+      const filename = path.join(os.tmpdir(), `audio-${Date.now()}.webm`);
+      fs.writeFileSync(filename, raw);
+      console.log('TEMP FILE:', filename);
+
+      let transcriptText = '';
 
       try {
-        // 🎙️ Whisper STT
-        const formData = new FormData();
-        formData.append('file', fs.createReadStream(audioPath));
-        formData.append('model', 'whisper-1');
-        formData.append('language', 'sr');
+        console.log('TRANSCRIPTION START');
 
-        const whisperResp = await axios.post(
-          'https://api.openai.com/v1/audio/transcriptions',
-          formData,
+        const transcript = await openai.audio.transcriptions.create({
+          file: fs.createReadStream(filename),
+          model: 'gpt-4o-transcribe',
+          language: 'sr'
+        });
+
+        transcriptText = (transcript.text || '').trim();
+        console.log('TRANSCRIPT TEXT:', transcriptText);
+      } catch (err) {
+        console.error('❌ Greška transkripcije FULL:', err);
+        ws.send(JSON.stringify({
+          type: 'reply',
+          text: 'Nisam vas dobro razumeo. Možete ponoviti?'
+        }));
+        fs.existsSync(filename) && fs.unlinkSync(filename);
+        return;
+      }
+
+      fs.existsSync(filename) && fs.unlinkSync(filename);
+
+      if (!transcriptText) {
+        console.log('EMPTY TRANSCRIPT');
+        ws.send(JSON.stringify({
+          type: 'reply',
+          text: 'Nisam vas dobro razumeo. Možete ponoviti?'
+        }));
+        return;
+      }
+
+      console.log('🎤 Korisnik rekao:', transcriptText);
+
+      ws.send(JSON.stringify({
+        type: 'transcript',
+        text: transcriptText
+      }));
+
+      let phpData = {};
+
+      try {
+        console.log('CALLING PHP:', PHP_CHATBOT_URL);
+
+        const phpRes = await axios.post(
+          PHP_CHATBOT_URL,
+          { message: transcriptText },
           {
             headers: {
-              'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-              ...formData.getHeaders(),
-            }
+              'Content-Type': 'application/json',
+              ...(phpSessionId ? { Cookie: `PHPSESSID=${phpSessionId}` } : {})
+            },
+            timeout: 40000
           }
         );
 
-        const userText = whisperResp.data.text;
-        console.log("🎤 Korisnik rekao:", userText);
-
-        // 🔁 Uzimamo dodatni kontekst (PHP endpoint)
-        const context = await getLatestMessageFromPHP();
-
-        // 💬 Chat
-        const chat = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: `Odgovaraj vrlo kratko i jasno, isključivo na srpskom jeziku.
-              Ako korisnik pita za uslugu ili zaposlenog, koristi sledeći kontekst:
-              Usluge: ${(context.services || []).map(s => s.name).join(", ") || "nema"}
-              Zaposleni: ${context.staff?.join(", ") || "nema"}`
-            },
-            { role: 'user', content: userText }
-          ]
-        });
-
-        const botText = chat.choices[0].message.content;
-        console.log("🤖 Bot odgovorio:", botText);
-
-        // 🔊 TTS
-        const ttsResp = await openai.audio.speech.create({
-          model: "tts-1",
-          voice: "onyx",
-          input: botText
-        });
-
-        const audioBuffer = Buffer.from(await ttsResp.arrayBuffer());
-        ws.send(audioBuffer);
+        phpData = phpRes.data || {};
+        console.log('PHP DATA:', phpData);
       } catch (err) {
-        console.error("❌ Greška:", err.response?.data || err.message);
-        ws.send("Greška u obradi.");
+        console.error('❌ Greška chatbot_gpt.php FULL:', err.response?.data || err.message || err);
+        ws.send(JSON.stringify({
+          type: 'reply',
+          text: 'Greška pri obradi zahteva.'
+        }));
+        return;
       }
 
-      fs.unlinkSync(audioPath); // obriši temp fajl
-    } else {
-      buffer.push(data);
+      const reply = String(phpData.reply || 'Došlo je do greške.').trim();
+
+      console.log('🤖 PHP reply:', reply);
+
+      ws.send(JSON.stringify({
+        type: 'reply',
+        text: reply,
+        options: Array.isArray(phpData.options) ? phpData.options : [],
+        slots: Array.isArray(phpData.slots) ? phpData.slots : []
+      }));
+
+      try {
+        console.log('TTS START:', reply);
+
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: 'alloy',
+          input: reply
+        });
+
+        const audioBuffer = Buffer.from(await speech.arrayBuffer());
+        console.log('SENDING AUDIO BACK:', audioBuffer.length);
+
+        ws.send(audioBuffer, { binary: true });
+      } catch (err) {
+        console.error('❌ Greška TTS FULL:', err);
+      }
+    } catch (err) {
+      console.error('❌ WS greška FULL:', err);
+      ws.send(JSON.stringify({
+        type: 'reply',
+        text: 'Greška pri glasovnoj komunikaciji.'
+      }));
     }
+  });
+
+  ws.on('close', () => {
+    console.log('🔌 Klijent se diskonektovao');
+    audioBuffers = [];
   });
 });
 
-async function getLatestMessageFromPHP() {
-  try {
-    const res = await axios.get("https://planiraj.me/api/get_latest_message.php");
-    return res.data; 
-    // očekuje { message: "...", services: [...], staff: [...] }
-  } catch (err) {
-    console.error("❌ Greška u fetch-u iz PHP-a:", err.message);
-    return { services: [], staff: [] };
-  }
-}
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`✅ WS server pokrenut na portu ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
 });
