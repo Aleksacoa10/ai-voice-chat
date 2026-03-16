@@ -133,9 +133,10 @@ transcriptText = cyrToLat((transcript.text || '').trim());
           PHP_CHATBOT_URL,
           { message: transcriptText },
           {
-headers:{
-  "Content-Type":"application/json"
-},
+            headers: {
+              'Content-Type': 'application/json',
+              ...(phpSessionId ? { Cookie: `PHPSESSID=${phpSessionId}` } : {})
+            },
             timeout: 40000
           }
         );
@@ -163,31 +164,18 @@ headers:{
       }));
 
       try {
-console.log('TTS START:', reply);
-console.log("🔊 ELEVENLABS TTS:", reply);
+        console.log('TTS START:', reply);
 
-console.log("VOICE_ID:", process.env.ELEVEN_VOICE_ID);
-const tts = await axios.post(
-  `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
-  {
-    text: reply,
-    model_id: "eleven_multilingual_v2",
-    voice_settings: {
-      stability: 0.5,
-      similarity_boost: 0.75
-    }
-  },
-  {
-    responseType: "arraybuffer",
-    headers: {
-      "xi-api-key": process.env.ELEVEN_API_KEY,
-      "Accept": "audio/mpeg",
-      "Content-Type": "application/json"
-    }
-  }
-);
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: 'alloy',
+          input: reply
+        });
 
-ws.send(Buffer.from(tts.data), { binary: true });
+        const audioBuffer = Buffer.from(await speech.arrayBuffer());
+        console.log('SENDING AUDIO BACK:', audioBuffer.length);
+
+        ws.send(audioBuffer, { binary: true });
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
@@ -210,3 +198,4 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
 });
+
