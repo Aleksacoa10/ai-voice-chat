@@ -165,19 +165,23 @@ headers:{
       try {
 console.log('TTS START:', reply);
 console.log("🔊 ELEVENLABS TTS:", reply);
-console.log("ELEVEN_API_KEY:", process.env.ELEVEN_API_KEY);
-console.log("VOICE_ID:", process.env.ELEVEN_VOICE_ID);
 
+console.log("VOICE_ID:", process.env.ELEVEN_VOICE_ID);
 const tts = await axios.post(
   `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
   {
     text: reply,
-    model_id: "eleven_multilingual_v2"
+    model_id: "eleven_multilingual_v2",
+    voice_settings: {
+      stability: 0.5,
+      similarity_boost: 0.75
+    }
   },
   {
     responseType: "arraybuffer",
     headers: {
       "xi-api-key": process.env.ELEVEN_API_KEY,
+      "Accept": "audio/mpeg",
       "Content-Type": "application/json"
     }
   }
