@@ -166,6 +166,8 @@ transcriptText = cyrToLat((transcript.text || '').trim());
       try {
 console.log('TTS START:', reply);
 console.log("🔊 ELEVENLABS TTS:", reply);
+console.log("ELEVEN_API_KEY:", process.env.ELEVEN_API_KEY);
+console.log("VOICE_ID:", process.env.ELEVEN_VOICE_ID);
 
 const tts = await axios.post(
   `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
