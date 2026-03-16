@@ -84,7 +84,7 @@ wss.on('connection', (ws, req) => {
       console.log('TEMP FILE:', filename);
 
       let transcriptText = '';
-
+ 
       try {
         console.log('TRANSCRIPTION START');
 
