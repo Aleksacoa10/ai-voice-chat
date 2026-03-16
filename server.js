@@ -155,7 +155,7 @@ console.log("GOOGLE TTS REQUEST:", reply);
 voice: {
   languageCode: "hr-HR",
   name: "hr-HR-Wavenet-A"
-}
+},
             audioConfig: {
               audioEncoding: "MP3",
               speakingRate: 1
