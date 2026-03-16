@@ -85,7 +85,7 @@ wss.on('connection', (ws, req) => {
 
         const transcript = await openai.audio.transcriptions.create({
           file: await toFile(raw, 'audio.webm'),
-          model: 'gpt-4o-transcribe',
+          model: 'whisper-1',
           language: 'sr'
         });
 
