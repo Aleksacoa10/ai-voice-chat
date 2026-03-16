@@ -133,9 +133,8 @@ transcriptText = cyrToLat((transcript.text || '').trim());
           PHP_CHATBOT_URL,
           { message: transcriptText },
           {
-    headers: {
-  "Authorization": `Bearer ${process.env.ELEVEN_API_KEY}`,
-  "Content-Type": "application/json"
+headers:{
+  "Content-Type":"application/json"
 },
             timeout: 40000
           }
