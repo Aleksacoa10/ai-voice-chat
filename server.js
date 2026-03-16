@@ -147,7 +147,7 @@ wss.on('connection', (ws, req) => {
       try {
 
         const googleKey = "AIzaSyCXTDFto66p2z0GGxA1YfHDkyslslDdoSU";
-
+console.log("GOOGLE TTS REQUEST:", reply);
         const googleRes = await axios.post(
           `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
           {
