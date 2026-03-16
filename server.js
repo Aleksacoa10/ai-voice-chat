@@ -173,12 +173,16 @@ ws.send(JSON.stringify({
 try {
   console.log('TTS START:', reply);
 
-  const speech = await speechPromise;
+const speech = await speechPromise;
 
-  const audioBuffer = Buffer.from(await speech.arrayBuffer());
-  console.log('SENDING AUDIO BACK:', audioBuffer.length);
+const reader = speech.toReadableStream().getReader();
 
-  ws.send(audioBuffer, { binary: true });
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  ws.send(Buffer.from(value), { binary: true });
+}
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
