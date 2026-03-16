@@ -165,17 +165,22 @@ transcriptText = cyrToLat((transcript.text || '').trim());
 
       try {
         console.log('TTS START:', reply);
+const tts = await axios.post(
+  `https://api.elevenlabs.io/v1/text-to-speech/${process.env.ELEVEN_VOICE_ID}`,
+  {
+    text: reply,
+    model_id: "eleven_multilingual_v2"
+  },
+  {
+    responseType: "arraybuffer",
+    headers: {
+      "xi-api-key": process.env.ELEVEN_API_KEY,
+      "Content-Type": "application/json"
+    }
+  }
+);
 
-        const speech = await openai.audio.speech.create({
-          model: 'gpt-4o-mini-tts',
-          voice: 'alloy',
-          input: reply
-        });
-
-        const audioBuffer = Buffer.from(await speech.arrayBuffer());
-        console.log('SENDING AUDIO BACK:', audioBuffer.length);
-
-        ws.send(audioBuffer, { binary: true });
+ws.send(Buffer.from(tts.data), { binary: true });
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
