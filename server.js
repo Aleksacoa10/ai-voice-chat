@@ -133,10 +133,10 @@ transcriptText = cyrToLat((transcript.text || '').trim());
           PHP_CHATBOT_URL,
           { message: transcriptText },
           {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(phpSessionId ? { Cookie: `PHPSESSID=${phpSessionId}` } : {})
-            },
+    headers: {
+  "Authorization": `Bearer ${process.env.ELEVEN_API_KEY}`,
+  "Content-Type": "application/json"
+},
             timeout: 40000
           }
         );
