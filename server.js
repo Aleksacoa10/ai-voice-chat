@@ -6,7 +6,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('ws');
 const { OpenAI } = require('openai');
-const axios = require('axios'); 
+const axios = require('axios');
 
 function cyrToLat(text) {
   const map = {
@@ -19,6 +19,7 @@ function cyrToLat(text) {
     Ф:'F', ф:'f', Х:'H', х:'h', Ц:'C', ц:'c', Ч:'Č', ч:'č',
     Џ:'Dž', џ:'dž', Ш:'Š', ш:'š'
   };
+
   return text.replace(/[А-Яа-яЉЊЂЋЏљњђћџ]/g, ch => map[ch] || ch);
 }
 
@@ -35,39 +36,57 @@ app.get('/', (req, res) => {
 });
 
 wss.on('connection', (ws, req) => {
+  console.log('🔌 Klijent povezan');
+  console.log('REQ URL:', req.url);
 
   const url = new URL(req.url, 'http://localhost');
   const phpSessionId = url.searchParams.get('php_session_id') || '';
+  console.log('PHP SESSION ID:', phpSessionId);
 
   let audioBuffers = [];
 
   ws.on('message', async (data, isBinary) => {
+    console.log('MESSAGE ARRIVED:', isBinary ? 'binary' : data.toString());
 
     try {
-
       if (isBinary) {
-        audioBuffers.push(Buffer.from(data));
+        const chunk = Buffer.from(data);
+        console.log('BINARY CHUNK SIZE:', chunk.length);
+        audioBuffers.push(chunk);
         return;
       }
 
       let msg = null;
       try {
         msg = JSON.parse(data.toString());
-      } catch {}
+      } catch {
+        msg = null;
+      }
+
+      console.log('PARSED MSG:', msg);
 
       if (msg?.type !== 'end') return;
 
-      if (!audioBuffers.length) return;
+      console.log('END RECEIVED');
+
+      if (!audioBuffers.length) {
+        console.log('NO AUDIO BUFFERS');
+        return;
+      }
 
       const raw = Buffer.concat(audioBuffers);
       audioBuffers = [];
 
+      console.log('TOTAL AUDIO SIZE:', raw.length);
+
       const filename = path.join(os.tmpdir(), `audio-${Date.now()}.webm`);
       fs.writeFileSync(filename, raw);
+      console.log('TEMP FILE:', filename);
 
       let transcriptText = '';
 
       try {
+        console.log('TRANSCRIPTION START');
 
         const transcript = await openai.audio.transcriptions.create({
           file: fs.createReadStream(filename),
@@ -75,15 +94,14 @@ wss.on('connection', (ws, req) => {
           language: 'sr'
         });
 
-        transcriptText = cyrToLat((transcript.text || '').trim());
-
+transcriptText = cyrToLat((transcript.text || '').trim());
+        console.log('TRANSCRIPT TEXT:', transcriptText);
       } catch (err) {
-
+        console.error('❌ Greška transkripcije FULL:', err);
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-
         fs.existsSync(filename) && fs.unlinkSync(filename);
         return;
       }
@@ -91,14 +109,15 @@ wss.on('connection', (ws, req) => {
       fs.existsSync(filename) && fs.unlinkSync(filename);
 
       if (!transcriptText) {
-
+        console.log('EMPTY TRANSCRIPT');
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Nisam vas dobro razumeo. Možete ponoviti?'
         }));
-
         return;
       }
+
+      console.log('🎤 Korisnik rekao:', transcriptText);
 
       ws.send(JSON.stringify({
         type: 'transcript',
@@ -108,6 +127,7 @@ wss.on('connection', (ws, req) => {
       let phpData = {};
 
       try {
+        console.log('CALLING PHP:', PHP_CHATBOT_URL);
 
         const phpRes = await axios.post(
           PHP_CHATBOT_URL,
@@ -122,18 +142,19 @@ wss.on('connection', (ws, req) => {
         );
 
         phpData = phpRes.data || {};
-
+        console.log('PHP DATA:', phpData);
       } catch (err) {
-
+        console.error('❌ Greška chatbot_gpt.php FULL:', err.response?.data || err.message || err);
         ws.send(JSON.stringify({
           type: 'reply',
           text: 'Greška pri obradi zahteva.'
         }));
-
         return;
       }
 
       const reply = String(phpData.reply || 'Došlo je do greške.').trim();
+
+      console.log('🤖 PHP reply:', reply);
 
       ws.send(JSON.stringify({
         type: 'reply',
@@ -142,59 +163,38 @@ wss.on('connection', (ws, req) => {
         slots: Array.isArray(phpData.slots) ? phpData.slots : []
       }));
 
-      /* GOOGLE TTS */
-
       try {
+        console.log('TTS START:', reply);
 
-        const googleKey = "AIzaSyCXTDFto66p2z0GGxA1YfHDkyslslDdoSU";
-console.log("GOOGLE TTS REQUEST:", reply);
-        const googleRes = await axios.post(
-          `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
-          {
-            input: { text: reply },
-voice: {
-  languageCode: "hr-HR",
-  name: "hr-HR-Wavenet-A"
-},
-            audioConfig: {
-              audioEncoding: "MP3",
-              speakingRate: 1
-            }
-          }
-        );
+        const speech = await openai.audio.speech.create({
+          model: 'gpt-4o-mini-tts',
+          voice: 'nova',
+          input: reply
+        });
 
-        const audioBuffer = Buffer.from(
-          googleRes.data.audioContent,
-          "base64"
-        );
+        const audioBuffer = Buffer.from(await speech.arrayBuffer());
+        console.log('SENDING AUDIO BACK:', audioBuffer.length);
 
         ws.send(audioBuffer, { binary: true });
-
       } catch (err) {
-
-        console.log("❌ Google TTS ERROR:", err.response?.data || err);
-
+        console.error('❌ Greška TTS FULL:', err);
       }
-
     } catch (err) {
-
+      console.error('❌ WS greška FULL:', err);
       ws.send(JSON.stringify({
         type: 'reply',
         text: 'Greška pri glasovnoj komunikaciji.'
       }));
-
     }
-
   });
 
   ws.on('close', () => {
+    console.log('🔌 Klijent se diskonektovao');
     audioBuffers = [];
   });
-
 });
 
 const PORT = process.env.PORT || 10000;
-
 server.listen(PORT, () => {
   console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
 });
