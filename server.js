@@ -172,19 +172,18 @@ try {
 
 const googleRes = await axios.post(
   `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
-{
-input: { text: reply },
-voice: {
-languageCode: "sr-RS",
-ssmlGender: "FEMALE"
-},
-audioConfig: {
-audioEncoding: "MP3",
-speakingRate: 1
-}
-}
+  {
+    input: { text: reply },
+    voice: {
+      languageCode: "sr-RS",
+      name: "sr-RS-Standard-A"
+    },
+    audioConfig: {
+      audioEncoding: "MP3",
+      speakingRate: 1
+    }
+  }
 );
-
 const audioBuffer = Buffer.from(
 googleRes.data.audioContent,
 "base64"
