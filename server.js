@@ -174,7 +174,7 @@ const googleRes = await axios.post(
     input: { text: reply },
     voice: {
       languageCode: "sr-RS",
-      name: "sr-RS-Wavenet-A"
+      ssmlGender: "FEMALE"
     },
     audioConfig: {
       audioEncoding: "MP3",
