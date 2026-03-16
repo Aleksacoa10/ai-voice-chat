@@ -152,10 +152,10 @@ console.log("GOOGLE TTS REQUEST:", reply);
           `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
           {
             input: { text: reply },
-     voice: {
-  languageCode: "sr-RS",
-  name: "sr-RS-Wavenet-A"
-},
+voice: {
+  languageCode: "hr-HR",
+  name: "hr-HR-Wavenet-A"
+}
             audioConfig: {
               audioEncoding: "MP3",
               speakingRate: 1
