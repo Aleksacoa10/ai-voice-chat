@@ -84,7 +84,7 @@ wss.on('connection', (ws, req) => {
       console.log('TEMP FILE:', filename);
 
       let transcriptText = '';
- 
+
       try {
         console.log('TRANSCRIPTION START');
 
@@ -166,16 +166,29 @@ transcriptText = cyrToLat((transcript.text || '').trim());
       try {
         console.log('TTS START:', reply);
 
-        const speech = await openai.audio.speech.create({
-          model: 'gpt-4o-mini-tts',
-          voice: "nova",
-          input: reply
-        });
+const googleKey = "AIzaSyCXTDFto66p2z0GGxA1YfHDkyslslDdoSU";
 
-        const audioBuffer = Buffer.from(await speech.arrayBuffer());
-        console.log('SENDING AUDIO BACK:', audioBuffer.length);
+const googleRes = await axios.post(
+  `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
+  {
+    input: { text: reply },
+    voice: {
+      languageCode: "sr-RS",
+      name: "sr-RS-Wavenet-A"
+    },
+    audioConfig: {
+      audioEncoding: "MP3",
+      speakingRate: 1
+    }
+  }
+);
 
-        ws.send(audioBuffer, { binary: true });
+const audioBuffer = Buffer.from(
+  googleRes.data.audioContent,
+  "base64"
+);
+
+ws.send(audioBuffer, { binary: true });
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
