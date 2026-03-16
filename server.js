@@ -154,28 +154,31 @@ transcriptText = cyrToLat((transcript.text || '').trim());
 
       const reply = String(phpData.reply || 'Došlo je do greške.').trim();
 
-      console.log('🤖 PHP reply:', reply);
+console.log('🤖 PHP reply:', reply);
 
-      ws.send(JSON.stringify({
-        type: 'reply',
-        text: reply,
-        options: Array.isArray(phpData.options) ? phpData.options : [],
-        slots: Array.isArray(phpData.slots) ? phpData.slots : []
-      }));
+const speechPromise = openai.audio.speech.create({
+  model: 'gpt-4o-mini-tts',
+  voice: 'nova',
+  input: reply,
+  format: 'wav'
+});
 
-      try {
-        console.log('TTS START:', reply);
+ws.send(JSON.stringify({
+  type: 'reply',
+  text: reply,
+  options: Array.isArray(phpData.options) ? phpData.options : [],
+  slots: Array.isArray(phpData.slots) ? phpData.slots : []
+}));
 
-        const speech = await openai.audio.speech.create({
-          model: 'gpt-4o-mini-tts',
-          voice: 'nova',
-          input: reply
-        });
+try {
+  console.log('TTS START:', reply);
 
-        const audioBuffer = Buffer.from(await speech.arrayBuffer());
-        console.log('SENDING AUDIO BACK:', audioBuffer.length);
+  const speech = await speechPromise;
 
-        ws.send(audioBuffer, { binary: true });
+  const audioBuffer = Buffer.from(await speech.arrayBuffer());
+  console.log('SENDING AUDIO BACK:', audioBuffer.length);
+
+  ws.send(audioBuffer, { binary: true });
       } catch (err) {
         console.error('❌ Greška TTS FULL:', err);
       }
