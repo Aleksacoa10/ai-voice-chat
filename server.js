@@ -168,21 +168,35 @@ transcriptText = cyrToLat((transcript.text || '').trim());
 
 const googleKey = "AIzaSyCXTDFto66p2z0GGxA1YfHDkyslslDdoSU";
 
+try {
+
 const googleRes = await axios.post(
   `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleKey}`,
-  {
-    input: { text: reply },
-    voice: {
-      languageCode: "sr-RS",
-      ssmlGender: "FEMALE"
-    },
-    audioConfig: {
-      audioEncoding: "MP3",
-      speakingRate: 1
-    }
-  }
+{
+input: { text: reply },
+voice: {
+languageCode: "sr-RS",
+ssmlGender: "FEMALE"
+},
+audioConfig: {
+audioEncoding: "MP3",
+speakingRate: 1
+}
+}
 );
 
+const audioBuffer = Buffer.from(
+googleRes.data.audioContent,
+"base64"
+);
+
+ws.send(audioBuffer, { binary: true });
+
+} catch (err) {
+
+console.log("GOOGLE TTS ERROR:", err.response?.data || err);
+
+}
 const audioBuffer = Buffer.from(
   googleRes.data.audioContent,
   "base64"
@@ -211,4 +225,3 @@ const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
   console.log(`🟢 WebSocket server pokrenut na portu ${PORT}`);
 });
-
