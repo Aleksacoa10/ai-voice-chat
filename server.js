@@ -175,7 +175,7 @@ try {
 
 const speech = await speechPromise;
 
-const reader = speech.toReadableStream().getReader();
+const reader = speech.body.getReader();
 
 while (true) {
   const { done, value } = await reader.read();
