@@ -145,13 +145,18 @@ wss.on("connection", (ws, req) => {
         format: "wav"
       });
 
-      ws.send(JSON.stringify({
-        type: "reply",
-        text: reply,
-        options: Array.isArray(phpData.options) ? phpData.options : [],
-        slots: Array.isArray(phpData.slots) ? phpData.slots : []
-      }));
+ const responsePayload = {
+  type: "reply",
+  text: reply,
+  options: Array.isArray(phpData.options) ? phpData.options : [],
+  slots: Array.isArray(phpData.slots) ? phpData.slots : [],
+  date: phpData.date || "",
+  selected_date: phpData.selected_date || phpData.date || "",
+  date_prompt: !!phpData.date_prompt,
+  booking_done: reply.includes("uspešno je poslat zahtev za rezervaciju")
+};
 
+ws.send(JSON.stringify(responsePayload));
       try {
 
         console.log("🔊 TTS START");
